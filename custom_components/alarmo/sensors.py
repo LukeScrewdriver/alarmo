@@ -42,6 +42,7 @@ ATTR_ALLOW_OPEN = "allow_open"
 ATTR_TRIGGER_UNAVAILABLE = "trigger_unavailable"
 ATTR_AUTO_BYPASS = "auto_bypass"
 ATTR_AUTO_BYPASS_MODES = "auto_bypass_modes"
+ATTR_REARM_ON_CLOSE = "rearm_on_close"
 ATTR_GROUP = "group"
 ATTR_GROUP_ID = "group_id"
 ATTR_TIMEOUT = "timeout"
@@ -140,6 +141,7 @@ class SensorHandler:
         self._subscriptions = []
         self._arm_timers = {}
         self._delay_on_timers = {}
+        self._rearm_timers = {}
         self._groups = {}
         self._group_events = {}
         self._startup_complete = False
@@ -284,6 +286,10 @@ class SensorHandler:
                 alarm_entity.bypassed_sensors
                 and entity in alarm_entity.bypassed_sensors
             ):
+                if watch_ready_to_arm and config.get(ATTR_REARM_ON_CLOSE):
+                    # keep listening to a bypassed sensor that should be
+                    #   included again once it closes
+                    entities.append(entity)
                 continue
             elif state in config[const.ATTR_MODES] or config[ATTR_ALWAYS_ON]:
                 entities.append(entity)
@@ -381,6 +387,13 @@ class SensorHandler:
         old_state = parse_sensor_state(event.data["old_state"])
         new_state = parse_sensor_state(event.data["new_state"])
         sensor_config = self._config[entity]
+
+        if self._is_bypassed(entity):
+            # a bypassed sensor is only watched when it may be included again
+            if old_state != new_state:
+                self._handle_bypassed_sensor_change(entity, new_state)
+            return
+
         if old_state == STATE_UNKNOWN:
             if new_state not in (STATE_OPEN, STATE_UNAVAILABLE) or (
                 sensor_config[ATTR_ALLOW_OPEN] and new_state == STATE_OPEN
@@ -525,6 +538,75 @@ class SensorHandler:
     def stop_arm_timer(self, entity=None):
         """Cancel timer(s) for automatical arming."""
         self._stop_entity_timer(self._arm_timers, entity)
+
+    def _is_bypassed(self, entity: str) -> bool:
+        """Check whether a sensor is currently bypassed in its area."""
+        sensor_config = self._config.get(entity)
+        if not sensor_config:
+            return False
+        alarm_entity = self.hass.data[const.DOMAIN]["areas"].get(sensor_config["area"])
+        return bool(
+            alarm_entity
+            and alarm_entity.bypassed_sensors
+            and entity in alarm_entity.bypassed_sensors
+        )
+
+    def _handle_bypassed_sensor_change(self, entity: str, new_state: str):
+        """Start or cancel the rearm timer of a bypassed sensor."""
+        if not self._config[entity].get(ATTR_REARM_ON_CLOSE):
+            return
+        if new_state == STATE_CLOSED:
+            _LOGGER.debug(
+                "bypassed sensor %s closed, including it again in %s",
+                entity,
+                const.SENSOR_REARM_TIME,
+            )
+            self.start_rearm_timer(entity)
+        else:
+            self.stop_rearm_timer(entity)
+
+    def start_rearm_timer(self, entity: str):
+        """Start timer for including a bypassed sensor again."""
+
+        def on_rearm_timer_finished():
+            current_state = parse_sensor_state(self.hass.states.get(entity))
+            if current_state != STATE_CLOSED or not self._is_bypassed(entity):
+                return
+            self._rearm_bypassed_sensor(entity)
+
+        self._start_entity_timer(
+            self._rearm_timers,
+            entity,
+            const.SENSOR_REARM_TIME,
+            on_rearm_timer_finished,
+        )
+
+    def stop_rearm_timer(self, entity: str | None = None):
+        """Cancel timer(s) for including bypassed sensors again."""
+        self._stop_entity_timer(self._rearm_timers, entity)
+
+    def _rearm_bypassed_sensor(self, entity: str):
+        """Remove a closed sensor from the bypass list of its area."""
+        area_id = self._config[entity]["area"]
+        alarm_entity = self.hass.data[const.DOMAIN]["areas"][area_id]
+        remaining = [
+            item for item in alarm_entity.bypassed_sensors if item != entity
+        ]
+        alarm_entity.bypassed_sensors = remaining
+        _LOGGER.info(
+            "Sensor %s is closed again, it is no longer bypassed in area %s",
+            entity,
+            alarm_entity.name,
+        )
+        alarm_entity.schedule_update_ha_state()
+
+        master = self.hass.data[const.DOMAIN].get("master")
+        if master:
+            # refreshes the combined list of bypassed sensors
+            master.async_update_state()
+
+        # start watching the sensor as a regular active sensor
+        self.async_watch_sensor_states()
 
     def _start_delay_on_timer(self, entity: str, new_state: str):
         """Start timer for delayed sensor trigger."""
@@ -745,6 +827,14 @@ class SensorHandler:
             area_id,
             alarm_entity.state,
         )
+
+        # Bypassed sensors that closed while HA was down can be included again
+        for entity_id in alarm_entity.bypassed_sensors or []:
+            if entity_id not in self._config:
+                continue
+            state = parse_sensor_state(self.hass.states.get(entity_id))
+            if state == STATE_CLOSED:
+                self._handle_bypassed_sensor_change(entity_id, state)
 
         # Get all active sensors for the current armed mode
         sensors_list = self.active_sensors_for_alarm_state(area_id)

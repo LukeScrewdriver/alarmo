@@ -109,6 +109,7 @@ export type AlarmoSensor = {
   trigger_unavailable: boolean;
   auto_bypass: boolean;
   auto_bypass_modes: EArmModes[];
+  rearm_on_close: boolean;
   area?: string;
   enabled: boolean;
   group?: string | null;

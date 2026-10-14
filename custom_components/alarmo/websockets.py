@@ -51,6 +51,7 @@ from .sensors import (
     ATTR_EVENT_COUNT,
     ATTR_ARM_ON_CLOSE,
     ATTR_NEW_ENTITY_ID,
+    ATTR_REARM_ON_CLOSE,
     ATTR_USE_EXIT_DELAY,
     ATTR_USE_ENTRY_DELAY,
     ATTR_AUTO_BYPASS_MODES,
@@ -232,6 +233,7 @@ class AlarmoSensorView(HomeAssistantView):
                 vol.Optional(ATTR_AUTO_BYPASS_MODES): vol.All(
                     cv.ensure_list, [vol.In(const.ARM_MODES)]
                 ),
+                vol.Optional(ATTR_REARM_ON_CLOSE): cv.boolean,
                 vol.Optional(const.ATTR_AREA): cv.string,
                 vol.Optional(const.ATTR_ENABLED): cv.boolean,
                 vol.Optional(ATTR_GROUP): vol.Any(cv.string, None),

@@ -425,6 +425,21 @@ export class SensorEditorCard extends SubscribeMixin(LitElement) {
                       </alarmo-settings-row>
                     `
             : ''}
+
+                <alarmo-settings-row .narrow=${this.narrow}>
+                  <span slot="heading">
+                    ${localize('panels.sensors.cards.editor.fields.rearm_on_close.heading', this.hass.language)}
+                  </span>
+                  <span slot="description">
+                    ${localize('panels.sensors.cards.editor.fields.rearm_on_close.description', this.hass.language)}
+                  </span>
+
+                  <ha-switch
+                    ?checked=${this.data.rearm_on_close}
+                    ?disabled=${this.data.always_on}
+                    @change=${(ev: Event) => this._SetData({ rearm_on_close: (ev.target as HTMLInputElement).checked })}
+                  ></ha-switch>
+                </alarmo-settings-row>
               `
         : ''}
 
@@ -504,6 +519,7 @@ export class SensorEditorCard extends SubscribeMixin(LitElement) {
               use_entry_delay: false,
               allow_open: false,
               auto_bypass: false,
+              rearm_on_close: false,
             };
           break;
         case 'use_entry_delay':
@@ -523,6 +539,10 @@ export class SensorEditorCard extends SubscribeMixin(LitElement) {
           break;
         case 'auto_bypass':
           this.data = { ...this.data, auto_bypass: val == true };
+          if (val) this.data = { ...this.data, always_on: false };
+          break;
+        case 'rearm_on_close':
+          this.data = { ...this.data, rearm_on_close: val == true };
           if (val) this.data = { ...this.data, always_on: false };
           break;
         case 'trigger_unavailable':

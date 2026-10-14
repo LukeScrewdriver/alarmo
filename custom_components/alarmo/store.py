@@ -104,6 +104,7 @@ class SensorEntry:
     trigger_unavailable = attr.ib(type=bool, default=False)
     auto_bypass = attr.ib(type=bool, default=False)
     auto_bypass_modes = attr.ib(type=list, default=[])
+    rearm_on_close = attr.ib(type=bool, default=False)
     area = attr.ib(type=str, default=None)
     enabled = attr.ib(type=bool, default=True)
     entry_delay = attr.ib(type=int, default=None)

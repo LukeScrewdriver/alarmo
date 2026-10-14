@@ -263,6 +263,10 @@
               "description": "Escludi questo sensore dall'allarme se è aperto durante l'attivazione.",
               "modes": "Modalità in cui il sensore può essere escluso"
             },
+            "rearm_on_close": {
+              "heading": "Includi di nuovo alla chiusura",
+              "description": "Se il sensore è stato escluso durante l'attivazione, includilo di nuovo dopo che è rimasto chiuso per 10 secondi."
+            },
             "trigger_unavailable": {
               "heading": "Fai scattare l'allarme quando non disponibile",
               "description": "L'allarme scatterà quando lo stato del sensore diverrà 'non disponibile'."

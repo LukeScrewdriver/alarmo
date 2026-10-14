@@ -33,6 +33,8 @@ PANEL_NAME = "alarm-panel"
 
 INITIALIZATION_TIME = datetime.timedelta(seconds=60)
 SENSOR_ARM_TIME = datetime.timedelta(seconds=5)
+# time a bypassed sensor must stay closed before it is included again
+SENSOR_REARM_TIME = datetime.timedelta(seconds=10)
 
 STATES = [
     AlarmControlPanelState.ARMED_AWAY,
