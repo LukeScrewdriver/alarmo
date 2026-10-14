@@ -118,3 +118,54 @@ async def test_without_option_sensor_stays_bypassed(
         state = hass.states.get(ALARM_ENTITY)
         assert state.state == "armed_away"
         assert DOOR in (state.attributes.get("bypassed_sensors") or [])
+
+
+@pytest.mark.asyncio
+async def test_bypassed_motion_sensor_is_included_when_clear(
+    hass: Any, enable_custom_integrations: Any
+) -> None:
+    """A motion/presence sensor bypassed while arming is included once clear."""
+    motion = "binary_sensor.generic_area_1_motion_sensor"
+    area_1 = AreaFactory.create_area(area_id="area_1", name="Test Area 1")
+    sensors = [
+        {
+            **SensorFactory.create_motion_sensor(
+                entity_id=motion,
+                name="Generic Area 1 Motion",
+                area="area_1",
+                modes=["armed_away"],
+                auto_bypass=True,
+                auto_bypass_modes=["armed_away"],
+            ),
+            "rearm_on_close": True,
+        }
+    ]
+    storage, entry = setup_alarmo_entry(
+        hass, areas=[area_1], sensors=sensors, entry_id="test_rearm_on_close_motion"
+    )
+    with patch_alarmo_integration_dependencies(storage):
+        await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        hass.states.async_set(motion, "on")
+        await hass.async_block_till_done()
+        await hass.services.async_call(
+            "alarmo",
+            "arm",
+            {"entity_id": ALARM_ENTITY, "code": "1234"},
+            blocking=True,
+        )
+        await hass.async_block_till_done()
+        await advance_time(hass, area_1["modes"]["armed_away"]["exit_time"] + 1)
+
+        state = hass.states.get(ALARM_ENTITY)
+        assert state.state == "armed_away"
+        assert motion in (state.attributes.get("bypassed_sensors") or [])
+
+        hass.states.async_set(motion, "off")
+        await hass.async_block_till_done()
+        await advance_time(hass, REARM_TIME + 1)
+        assert not hass.states.get(ALARM_ENTITY).attributes.get("bypassed_sensors")
+
+        hass.states.async_set(motion, "on")
+        await hass.async_block_till_done()
+        assert hass.states.get(ALARM_ENTITY).state in ("pending", "triggered")

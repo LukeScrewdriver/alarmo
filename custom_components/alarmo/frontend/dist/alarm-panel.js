@@ -2118,7 +2118,7 @@ const qs=2;class Ps{constructor(e){}get _$AU(){return this._$AM._$AU}_$AT(e,a,i)
                   ></ha-switch>
                 </alarmo-settings-row>
               `:""}
-          ${!this.data.type||[Xn.Window,Xn.Door,Xn.Other].includes(this.data.type)?K`
+          ${!this.data.type||[Xn.Window,Xn.Door,Xn.Motion,Xn.Other].includes(this.data.type)?K`
                 <alarmo-settings-row .narrow=${this.narrow}>
                   <span slot="heading">
                     ${Cn("panels.sensors.cards.editor.fields.auto_bypass.heading",this.hass.language)}
